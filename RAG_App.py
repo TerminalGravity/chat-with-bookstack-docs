@@ -145,8 +145,30 @@ def prepare_rag_pipeline(selected_pages):
     return qa_chain
 
 def main():
-    st.title("BookStack Export Application")
+    st.set_page_config(
+        page_title="BookStack Export Application",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+
+    st.title("📚 BookStack Export Application")
     st.sidebar.title("Controls")
+
+    # Add an expandable section with details about the app
+    with st.expander("About this App"):
+        st.markdown("""
+        **BookStack Export Application** helps you to:
+        - Retrieve and display shelves and books from a BookStack instance.
+        - Select specific books and pages for export.
+        - Export selected books and pages to a downloadable ZIP file.
+        - Prepare selected pages for use in a Retrieval-Augmented Generation (RAG) pipeline.
+        
+        **Usage Instructions:**
+        1. Use the sidebar to select shelves and books.
+        2. Select the pages you want to export.
+        3. Use the buttons to either export the selected pages or prepare them for a RAG pipeline.
+        4. If prepared for a RAG pipeline, you can interact with the selected content using conversational queries.
+        """)
 
     # Fetch shelves
     shelves = fetch_shelves()
@@ -155,6 +177,7 @@ def main():
 
     # Display shelves with checkboxes
     selected_shelves = []
+    st.sidebar.header("Select Shelves")
     for shelf in shelves:
         if st.sidebar.checkbox(f"{shelf['name']} (ID: {shelf['id']})", key=f"shelf_{shelf['id']}"):
             selected_shelves.append(shelf)
@@ -165,8 +188,9 @@ def main():
 
     # Display books for selected shelves
     selected_books = []
+    st.header("Books")
     for shelf in selected_shelves:
-        st.markdown(f"### Shelf: {shelf['name']} (ID: {shelf['id']})")
+        st.subheader(f"Shelf: {shelf['name']} (ID: {shelf['id']})")
         books = fetch_books(shelf['id'])
         for book in books:
             if st.checkbox(f"{book['name']} (ID: {book['id']})", key=f"book_{book['id']}"):
@@ -178,15 +202,16 @@ def main():
 
     # Display pages for selected books
     selected_pages = []
+    st.header("Pages")
     for book in selected_books:
-        st.markdown(f"#### Book: {book['name']} (ID: {book['id']})")
+        st.subheader(f"Book: {book['name']} (ID: {book['id']})")
         contents = fetch_book_contents(book['id'])
         for content in contents:
             if content['type'] == 'chapter':
                 chapter_id = content['id']
                 chapter_name = content['name']
                 chapter_slug = content['slug']
-                st.markdown(f"    - **Chapter: {chapter_name}** (ID: {chapter_id})")
+                st.markdown(f"**Chapter: {chapter_name} (ID: {chapter_id})**")
 
                 for page in content['pages']:
                     page_id = page['id']
@@ -205,6 +230,7 @@ def main():
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col3:
+        st.subheader("Actions")
         if st.button("Export Selected Books and Pages"):
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -228,8 +254,8 @@ def main():
                 st.session_state.qa_chain = qa_chain
 
     if "qa_chain" in st.session_state:
-        st.title("Chat with the BookStack docs, powered by LangChain 💬📘")
-        st.info("Ask me a question about the BookStack library!", icon="📘")
+        st.title("Chat with company knowledge")
+        st.info("Ask me a question", icon="💬")
 
         # Initialize the chat messages history if not present
         if "messages" not in st.session_state:
