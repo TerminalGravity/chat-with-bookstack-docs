@@ -2,3 +2,4 @@
 .env
 data
 vectorstore
+BookstackAPI_Config.json
