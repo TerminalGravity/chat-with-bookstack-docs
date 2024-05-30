@@ -137,10 +137,8 @@ def prepare_rag_pipeline(selected_pages):
         model_name="gpt-3.5-turbo",
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         temperature=0.5,
-        model_kwargs={"system_message": "You are a friendly and helpful customer support representative for the BookStack Python library. "
-                                        "Your job is to assist users with their questions and provide clear, concise, and accurate information. "
-                                        "Ensure that your responses are polite, supportive, and easy to understand."}
     )
+
     qa_chain = ConversationalRetrievalChain.from_llm(
         llm, retriever=vector_store.as_retriever()
     )
