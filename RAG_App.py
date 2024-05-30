@@ -3,10 +3,9 @@ import requests
 import os
 import zipfile
 import io
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.llms import OpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.docstore.document import Document
@@ -134,13 +133,13 @@ def prepare_rag_pipeline(selected_pages):
     vector_store = FAISS.from_documents(docs, embeddings)
 
     # Create a conversational retrieval chain
-    llm = OpenAI(
+    llm = ChatOpenAI(
         model_name="gpt-3.5-turbo",
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         temperature=0.5,
-        system_message="You are a friendly and helpful customer support representative for the BookStack Python library. "
-                       "Your job is to assist users with their questions and provide clear, concise, and accurate information. "
-                       "Ensure that your responses are polite, supportive, and easy to understand."
+        model_kwargs={"system_message": "You are a friendly and helpful customer support representative for the BookStack Python library. "
+                                        "Your job is to assist users with their questions and provide clear, concise, and accurate information. "
+                                        "Ensure that your responses are polite, supportive, and easy to understand."}
     )
     qa_chain = ConversationalRetrievalChain.from_llm(
         llm, retriever=vector_store.as_retriever()
@@ -204,27 +203,31 @@ def main():
                 if st.checkbox(f"Page: {page_name} (ID: {page_id})", key=f"page_{page_id}"):
                     selected_pages.append(content)
 
-    if st.sidebar.button("Export Selected Books and Pages"):
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for book in selected_books:
-                export_book_pages(book, zip_file)
-        zip_buffer.seek(0)
-        st.sidebar.success("Export completed.")
-        st.sidebar.download_button(
-            label="Download Exported Books and Pages",
-            data=zip_buffer,
-            file_name="exported_books_and_pages.zip",
-            mime="application/zip"
-        )
+    # Create columns for layout
+    col1, col2, col3 = st.columns([1, 1, 1])
 
-    if st.sidebar.button("Prepare for RAG Pipeline"):
-        if not selected_pages:
-            st.sidebar.error("No pages selected for RAG pipeline.")
-        else:
-            qa_chain = prepare_rag_pipeline(selected_pages)
-            st.sidebar.success("Preparation for RAG pipeline completed.")
-            st.session_state.qa_chain = qa_chain
+    with col3:
+        if st.button("Export Selected Books and Pages"):
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for book in selected_books:
+                    export_book_pages(book, zip_file)
+            zip_buffer.seek(0)
+            st.success("Export completed.")
+            st.download_button(
+                label="Download Exported Books and Pages",
+                data=zip_buffer,
+                file_name="exported_books_and_pages.zip",
+                mime="application/zip"
+            )
+
+        if st.button("Prepare for RAG Pipeline"):
+            if not selected_pages:
+                st.error("No pages selected for RAG pipeline.")
+            else:
+                qa_chain = prepare_rag_pipeline(selected_pages)
+                st.success("Preparation for RAG pipeline completed.")
+                st.session_state.qa_chain = qa_chain
 
     if "qa_chain" in st.session_state:
         st.title("Chat with the BookStack docs, powered by LangChain 💬📘")
@@ -233,6 +236,8 @@ def main():
         # Initialize the chat messages history if not present
         if "messages" not in st.session_state:
             st.session_state.messages = []
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
 
         # Prompt for user input and save to chat history
         prompt = st.text_input("Your question", key="prompt")
@@ -246,11 +251,10 @@ def main():
         # If last message is not from assistant, generate a new response
         if st.session_state.messages and st.session_state.messages[-1]["role"] != "assistant":
             with st.spinner("Thinking..."):
-                response = st.session_state.qa_chain({"question": prompt, "chat_history": st.session_state.chat_history})
+                response = st.session_state.qa_chain.invoke({"question": prompt, "chat_history": st.session_state.chat_history})
                 st.session_state.messages.append({"role": "assistant", "content": response['answer']})
                 st.session_state.chat_history.append((prompt, response['answer']))
                 st.write(f"Assistant: {response['answer']}")
 
 if __name__ == "__main__":
     main()
-   
